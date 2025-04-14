@@ -1,30 +1,28 @@
-# Compiler to use
+# Compiler
 CC = gcc
 
 # Compiler flags
 CFLAGS = -g -Wall -std=c99 -fsanitize=address -fsanitize=undefined
 
-# Source files
+# Source and header files
 SRCS = mysh.c
-
-# Object files
-OBJS = mysh.o
+OBJS = mysh.o token.o
+HEADERS = token.h commands.h
 
 # Executable name
 TARGET = mysh
 
-# Default target to build all specified targets
-all: 
-	$(CC) $(CFLAGS) -o mysh $(SRCS)
+# Default build
+all: $(TARGET)
 
-# Rule to build the executable
+# Link object files into final executable
 $(TARGET): $(OBJS)
 	$(CC) $(CFLAGS) -o $(TARGET) $(OBJS)
 
-# Rule to compile .c files to .o files
-%.o: %.c
+# Compile each .c file into a .o file
+%.o: %.c $(HEADERS)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# Rule to clean up generated files
+# Clean up
 clean:
 	rm -f $(OBJS) $(TARGET)

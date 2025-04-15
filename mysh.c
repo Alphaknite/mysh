@@ -11,6 +11,8 @@
 #define WELCOME_MESSAGE "Welcome to my shell!\n"
 #define EXIT_MESSAGE "mysh: exiting\n"
 
+void executeCommand(char **tokens, int count, command *cmd);
+
 void processCommand(char *cmdLine) {
     if (strlen(cmdLine) == 0 || cmdLine[0] == '#') {
         return;
@@ -52,6 +54,7 @@ void processCommand(char *cmdLine) {
         }
 
         // executeCommand(cmd);
+        executeCommand(tokens, count, cmd);
     }
 
     for (int i = 0; i < count; i++) {
@@ -82,6 +85,50 @@ void readInput(int fd) {
         int remaining = buffer_index - (newline - buffer + 1);
         memmove(buffer, newline + 1, remaining);
         buffer_index = remaining;
+    }
+}
+
+void executeCommand(char **tokens, int count, command *cmd) {
+    if (strcmp(tokens[0], "cd") == 0) {
+        if (count != 2) {
+            fprintf(stderr, "mysh: cd requires 1 argument\n");
+            return;
+        }
+        
+        char *path = tokens[1];
+        if (chdir(path) != 0) {
+            fprintf(stderr, "mysh: cd failed\n");
+        }
+        return;
+    }
+
+    if (strcmp(tokens[0], "pwd") == 0) {
+        char cwd[1024];
+        if (getcwd(cwd, sizeof(cwd))) {
+            printf("%s\n", cwd);
+        }
+        else {
+            fprintf(stderr, "mysh: pwd failed\n");
+        }
+        return;
+    }
+    
+    if (strcmp(tokens[0], "which") == 0) {
+        if (count != 2) {
+            fprintf(stderr, "mysh: which requires 1 argument\n");
+            return;
+        }
+        char *prog = tokens[1];
+        char *paths[] = {"/usr/local/bin", "/usr/bin", "/bin"};
+
+        for (int i = 0; i < 3; i++) {
+            char path[1030];
+            snprintf(path, sizeof(path), "%s/%s", paths[i], prog);
+            if (access(path, X_OK) == 0) {
+                printf("%s\n", path);
+            }
+        }
+        return;
     }
 }
 

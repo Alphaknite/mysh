@@ -63,6 +63,7 @@ command *parseCommand(char **tokens, int count) {
             cmd->argument[argIndex++] = strdup(tokens[i]);
         }
     }
+    cmd->argument[argIndex] = NULL;
     return cmd;
 }
 

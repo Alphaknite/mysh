@@ -64,7 +64,7 @@ void processCommand(char *cmdLine) {
 }
 
 void readInput(int fd) {
-	static char buffer[MAX_INPUT];
+    static char buffer[MAX_INPUT];
     static int buffer_index = 0;
     int bytesRead;
 
@@ -74,21 +74,29 @@ void readInput(int fd) {
     buffer_index += bytesRead;
     buffer[buffer_index] = '\0';
 
-    char *newline = strchr(buffer, '\n');
-    if (newline != NULL) {
+    char *start = buffer;
+    char *newline;
+
+    while ((newline = strchr(start, '\n')) != NULL) {
         *newline = '\0';
 
         char cmd[MAX_INPUT];
-        strncpy(cmd, buffer, MAX_INPUT);
+        strncpy(cmd, start, MAX_INPUT);
+        cmd[MAX_INPUT - 1] = '\0'; 
+
         processCommand(cmd);
 
-        int remaining = buffer_index - (newline - buffer + 1);
-        memmove(buffer, newline + 1, remaining);
-        buffer_index = remaining;
+        start = newline + 1;
     }
+
+    int remaining = buffer + buffer_index - start;
+    memmove(buffer, start, remaining);
+    buffer_index = remaining;
 }
 
+
 void executeCommand(char **tokens, int count, command *cmd) {
+    char *paths[] = {"/usr/local/bin", "/usr/bin", "/bin"};
     if (strcmp(tokens[0], "cd") == 0) {
         if (count != 2) {
             fprintf(stderr, "mysh: cd requires 1 argument\n");
@@ -97,7 +105,7 @@ void executeCommand(char **tokens, int count, command *cmd) {
         
         char *path = tokens[1];
         if (chdir(path) != 0) {
-            fprintf(stderr, "mysh: cd failed\n");
+            fprintf(stderr, "mysh: No such file or directory\n");
         }
         return;
     }
@@ -119,8 +127,6 @@ void executeCommand(char **tokens, int count, command *cmd) {
             return;
         }
         char *prog = tokens[1];
-        char *paths[] = {"/usr/local/bin", "/usr/bin", "/bin"};
-
         for (int i = 0; i < 3; i++) {
             char path[1030];
             snprintf(path, sizeof(path), "%s/%s", paths[i], prog);
@@ -130,6 +136,58 @@ void executeCommand(char **tokens, int count, command *cmd) {
         }
         return;
     }
+
+    pid_t pid = fork();
+    if (pid == 0) {
+        
+        if (cmd->inputFile != NULL) {
+            int input = open(cmd->inputFile, O_RDONLY);
+            if (input < 0) {
+                fprintf(stderr, "mysh: input file failed to open\n");
+                exit(1);
+            }
+            dup2(input, 0);
+            close(input);
+        }
+        
+        if (cmd->outputFile != NULL) {
+            int output = open(cmd->outputFile, O_WRONLY | O_CREAT | O_TRUNC, 0640);
+            if (output < 0) {
+                fprintf(stderr, "mysh: output file failed to open\n");
+                exit(1);
+            }
+            dup2(output, 1);
+            close(output);
+        }
+        
+        if (strchr(cmd->cmdName, '/')) {
+            if (access(cmd->cmdName, X_OK) == 0) {
+                execv(cmd->cmdName, cmd->argument);
+            }
+        }
+        else {
+            char path[1030];
+            for (int i = 0; i < 3; i++) {
+                snprintf(path, sizeof(path), "%s/%s", paths[i], cmd->cmdName);
+                if (access(path, X_OK) == 0) {
+                    execv(path, cmd->argument);
+                }
+            }
+        }
+
+        fprintf(stderr, "mysh: command not found: %s\n", cmd->cmdName);
+        exit(1);
+    }
+
+    else if (pid > 0) {
+        int status;
+        waitpid(pid, &status, 0);
+    }
+
+    else {
+        fprintf(stderr, "mysh: fork fail");
+    }
+
 }
 
 //interactive mode

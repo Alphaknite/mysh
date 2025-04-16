@@ -14,6 +14,7 @@ typedef struct command {
 
 int tokenize(char *line, char **tokens); //splits line into tokens: words, <, >, |
 command *parseCommand(char **tokens, int count); //builds a command struct from tokens
+int expandWildcard(const char *pattern, char ***argList, int *argIndex); //expands wildcards *.<extension>
 void freeCommand(command *cmd); //frees dynamically allocated memory in command
 
 #endif

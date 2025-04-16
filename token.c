@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <dirent.h>
+#include <fnmatch.h>
 #include "token.h"
 
 int tokenize(char *line, char **tokens) {
@@ -49,21 +51,52 @@ command *parseCommand(char **tokens, int count) {
         count = pipeIndex;  
     }
 
-    //init argument list (max size = count + 1)
-    cmd->argument = calloc(count + 1, sizeof(char*));
-
+    cmd->argument = calloc(MAX_TOKENS + 1, sizeof(char*));
+    
     for (; i < count; i++) {
         if (strcmp(tokens[i], "<") == 0 && i + 1 < count) {
             cmd->inputFile = strdup(tokens[++i]);
         } else if (strcmp(tokens[i], ">") == 0 && i + 1 < count) {
             cmd->outputFile = strdup(tokens[++i]);
+        } else if (strchr(tokens[i], '*')) {
+            int matched = expandWildcard(tokens[i], &cmd->argument, &argIndex);
+            if (!matched) {
+                // if no match, keep the original token
+                cmd->argument[argIndex++] = strdup(tokens[i]);
+            }
+            // set cmdName if not already set
+            if (!cmd->cmdName && cmd->argument[0]) {
+                cmd->cmdName = strdup(cmd->argument[0]);
+            }
         } else {
-            //first real token is the command name
             if (!cmd->cmdName) cmd->cmdName = strdup(tokens[i]);
             cmd->argument[argIndex++] = strdup(tokens[i]);
         }
     }
+    cmd->argument[argIndex] = NULL;
     return cmd;
+}
+
+int expandWildcard(const char *pattern, char ***argList, int *argIndex) {
+    DIR *dir = opendir(".");
+    if (!dir) {
+        perror("opendir failed");
+        return 0;
+    }
+
+    struct dirent *entry;
+    int matched = 0;
+
+    while ((entry = readdir(dir)) != NULL) {
+        if (fnmatch(pattern, entry->d_name, 0) == 0) {
+            (*argList)[*argIndex] = strdup(entry->d_name);
+            (*argIndex)++;
+            matched = 1;
+        }
+    }
+
+    closedir(dir);
+    return matched;
 }
 
 void freeCommand(command *cmd) {
